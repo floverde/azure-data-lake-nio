@@ -203,9 +203,9 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
 
         // Use a temp file to avoid buffering the entire source file in memory.
-        java.io.File tmp = java.io.File.createTempFile("adls-copy-", null);
+        java.nio.file.Path tmp = Files.createTempFile("adls-copy-", null);
         try {
-            try (FileOutputStream fos = new FileOutputStream(tmp)) {
+            try (FileOutputStream fos = new FileOutputStream(tmp.toFile())) {
                 src.getFileSystem().getFileSystemClient()
                         .getFileClient(src.toAzurePathString())
                         .read(fos);
@@ -215,12 +215,12 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
             try {
                 dst.getFileSystem().getFileSystemClient()
                         .getFileClient(dst.toAzurePathString())
-                        .uploadFromFile(tmp.getAbsolutePath(), true);
+                        .uploadFromFile(tmp.toAbsolutePath().toString(), true);
             } catch (DataLakeStorageException e) {
                 throw toIOException(e, target);
             }
         } finally {
-            tmp.delete();
+            Files.deleteIfExists(tmp);
         }
     }
 
@@ -414,15 +414,15 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     /** OutputStream backed by a temp file; uploads on close (overwrite). */
     private static class UploadOutputStream extends OutputStream {
         private final com.azure.storage.file.datalake.DataLakeFileClient fileClient;
-        private final java.io.File tmpFile;
+        private final java.nio.file.Path tmpFile;
         private final FileOutputStream tmpOut;
         private boolean closed = false;
 
         UploadOutputStream(com.azure.storage.file.datalake.DataLakeFileClient fileClient)
                 throws IOException {
             this.fileClient = fileClient;
-            this.tmpFile = java.io.File.createTempFile("adls-upload-", null);
-            this.tmpOut = new FileOutputStream(tmpFile);
+            this.tmpFile = Files.createTempFile("adls-upload-", null);
+            this.tmpOut = new FileOutputStream(tmpFile.toFile());
         }
 
         @Override
@@ -442,12 +442,12 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
                 try {
                     tmpOut.close();
                     try {
-                        fileClient.uploadFromFile(tmpFile.getAbsolutePath(), true);
+                        fileClient.uploadFromFile(tmpFile.toAbsolutePath().toString(), true);
                     } catch (DataLakeStorageException e) {
                         throw new IOException("Failed to upload data", e);
                     }
                 } finally {
-                    tmpFile.delete();
+                    Files.deleteIfExists(tmpFile);
                 }
             }
         }
@@ -456,15 +456,15 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     /** OutputStream backed by a temp file; appends content on close. */
     private static class AppendOutputStream extends OutputStream {
         private final com.azure.storage.file.datalake.DataLakeFileClient fileClient;
-        private final java.io.File tmpFile;
+        private final java.nio.file.Path tmpFile;
         private final FileOutputStream tmpOut;
         private boolean closed = false;
 
         AppendOutputStream(com.azure.storage.file.datalake.DataLakeFileClient fileClient)
                 throws IOException {
             this.fileClient = fileClient;
-            this.tmpFile = java.io.File.createTempFile("adls-append-", null);
-            this.tmpOut = new FileOutputStream(tmpFile);
+            this.tmpFile = Files.createTempFile("adls-append-", null);
+            this.tmpOut = new FileOutputStream(tmpFile.toFile());
         }
 
         @Override
@@ -483,7 +483,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
                 closed = true;
                 try {
                     tmpOut.close();
-                    long dataLen = tmpFile.length();
+                    long dataLen = Files.size(tmpFile);
                     long currentSize = 0;
                     try {
                         currentSize = fileClient.getProperties().getFileSize();
@@ -493,7 +493,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
                         }
                         // File doesn't exist yet — start from offset 0
                     }
-                    try (FileInputStream fis = new FileInputStream(tmpFile)) {
+                    try (FileInputStream fis = new FileInputStream(tmpFile.toFile())) {
                         fileClient.append(fis, currentSize, dataLen);
                     }
                     try {
@@ -502,7 +502,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
                         throw new IOException("Failed to flush append data", e);
                     }
                 } finally {
-                    tmpFile.delete();
+                    Files.deleteIfExists(tmpFile);
                 }
             }
         }
