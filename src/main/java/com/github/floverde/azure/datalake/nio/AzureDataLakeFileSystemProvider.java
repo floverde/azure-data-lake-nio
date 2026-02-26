@@ -203,7 +203,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
 
         // Use a temp file to avoid buffering the entire source file in memory.
-        java.nio.file.Path tmp = Files.createTempFile("adls-copy-", null);
+        java.nio.file.Path tmp = createSecureTempFile("adls-copy-");
         try {
             try (FileOutputStream fos = new FileOutputStream(tmp.toFile())) {
                 src.getFileSystem().getFileSystemClient()
@@ -411,6 +411,17 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
     }
 
+    private static java.nio.file.Path createSecureTempFile(String prefix) throws IOException {
+        try {
+            return Files.createTempFile(prefix, null,
+                    java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                            java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+        } catch (UnsupportedOperationException e) {
+            // Non-POSIX filesystem (e.g., Windows) — fall back to default
+            return Files.createTempFile(prefix, null);
+        }
+    }
+
     /** OutputStream backed by a temp file; uploads on close (overwrite). */
     private static class UploadOutputStream extends OutputStream {
         private final com.azure.storage.file.datalake.DataLakeFileClient fileClient;
@@ -421,7 +432,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         UploadOutputStream(com.azure.storage.file.datalake.DataLakeFileClient fileClient)
                 throws IOException {
             this.fileClient = fileClient;
-            this.tmpFile = Files.createTempFile("adls-upload-", null);
+            this.tmpFile = createSecureTempFile("adls-upload-");
             this.tmpOut = new FileOutputStream(tmpFile.toFile());
         }
 
@@ -463,7 +474,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         AppendOutputStream(com.azure.storage.file.datalake.DataLakeFileClient fileClient)
                 throws IOException {
             this.fileClient = fileClient;
-            this.tmpFile = Files.createTempFile("adls-append-", null);
+            this.tmpFile = createSecureTempFile("adls-append-");
             this.tmpOut = new FileOutputStream(tmpFile.toFile());
         }
 
