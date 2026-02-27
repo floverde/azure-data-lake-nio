@@ -17,6 +17,7 @@ import java.nio.file.attribute.*;
 import java.nio.file.spi.FileSystemProvider;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
 
@@ -25,6 +26,9 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     // Package-private to allow test subclass injection
     final Map<URI, AzureDataLakeFileSystem> fileSystems = new ConcurrentHashMap<>();
 
+    // Stored env for on-demand filesystem creation; keyed by azure.account.<account-name>.*
+    final AtomicReference<Map<String, ?>> storedEnv = new AtomicReference<>();
+
     @Override
     public String getScheme() {
         return SCHEME;
@@ -32,11 +36,49 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
 
     @Override
     public FileSystem newFileSystem(URI uri, Map<String, ?> env) throws IOException {
+        // Store env (with per-account keys) before any check so getFileSystem can use it later
+        if (env != null && !env.isEmpty()) {
+            storedEnv.set(env);
+        }
         URI rootUri = toRootUri(uri);
         if (fileSystems.containsKey(rootUri)) {
             throw new FileSystemAlreadyExistsException(rootUri.toString());
         }
+        AzureDataLakeFileSystem fs = buildFileSystem(uri, rootUri, env);
+        fileSystems.put(rootUri, fs);
+        return fs;
+    }
 
+    @Override
+    public FileSystem getFileSystem(URI uri) {
+        URI rootUri = toRootUri(uri);
+        AzureDataLakeFileSystem fs = fileSystems.get(rootUri);
+        if (fs != null) {
+            return fs;
+        }
+        Map<String, ?> env = storedEnv.get();
+        if (env == null) {
+            throw new FileSystemNotFoundException(rootUri.toString());
+        }
+        try {
+            AzureDataLakeFileSystem newFs = buildFileSystem(uri, rootUri, env);
+            AzureDataLakeFileSystem existing = fileSystems.putIfAbsent(rootUri, newFs);
+            return existing != null ? existing : newFs;
+        } catch (IOException e) {
+            throw (FileSystemNotFoundException)
+                    new FileSystemNotFoundException(rootUri.toString()).initCause(e);
+        }
+    }
+
+    /**
+     * Builds an {@link AzureDataLakeFileSystem} for the given URI.
+     * <p>
+     * The {@code env} map may contain per-account credentials using the format
+     * {@code azure.account.<account-name>.key} or {@code azure.account.<account-name>.sas.token}.
+     * </p>
+     */
+    protected AzureDataLakeFileSystem buildFileSystem(URI uri, URI rootUri, Map<String, ?> env)
+            throws IOException {
         // Parse the authority: container@account.dfs.core.windows.net
         String authority = uri.getAuthority();
         if (authority == null) {
@@ -49,18 +91,19 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
         String containerName = authority.substring(0, atIndex);
         String host = authority.substring(atIndex + 1);
+        String accountName = host.split("\\.")[0];
         String endpoint = "https://" + host;
 
         DataLakeServiceClientBuilder builder = new DataLakeServiceClientBuilder()
                 .endpoint(endpoint);
 
         if (env != null) {
-            if (env.containsKey("azure.account.key")) {
-                String accountName = host.split("\\.")[0];
-                String accountKey = (String) env.get("azure.account.key");
+            String keyPrefix = "azure.account." + accountName + ".";
+            if (env.containsKey(keyPrefix + "key")) {
+                String accountKey = (String) env.get(keyPrefix + "key");
                 builder.credential(new StorageSharedKeyCredential(accountName, accountKey));
-            } else if (env.containsKey("azure.sas.token")) {
-                String sasToken = (String) env.get("azure.sas.token");
+            } else if (env.containsKey(keyPrefix + "sas.token")) {
+                String sasToken = (String) env.get(keyPrefix + "sas.token");
                 builder.credential(new AzureSasCredential(sasToken));
             }
             // For service principal, add azure-identity dependency and use ClientSecretCredentialBuilder.
@@ -68,20 +111,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
 
         DataLakeServiceClient serviceClient = builder.buildClient();
         DataLakeFileSystemClient fsClient = serviceClient.getFileSystemClient(containerName);
-
-        AzureDataLakeFileSystem fs = new AzureDataLakeFileSystem(this, fsClient, rootUri);
-        fileSystems.put(rootUri, fs);
-        return fs;
-    }
-
-    @Override
-    public FileSystem getFileSystem(URI uri) {
-        URI rootUri = toRootUri(uri);
-        AzureDataLakeFileSystem fs = fileSystems.get(rootUri);
-        if (fs == null) {
-            throw new FileSystemNotFoundException(rootUri.toString());
-        }
-        return fs;
+        return new AzureDataLakeFileSystem(this, fsClient, rootUri);
     }
 
     @Override
