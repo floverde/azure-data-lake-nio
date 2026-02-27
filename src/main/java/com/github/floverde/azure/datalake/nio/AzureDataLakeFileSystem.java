@@ -1,6 +1,7 @@
 package com.github.floverde.azure.datalake.nio;
 
 import com.azure.storage.file.datalake.DataLakeFileSystemClient;
+import com.azure.storage.file.datalake.DataLakeServiceClient;
 
 import java.io.IOException;
 import java.net.URI;
@@ -8,26 +9,28 @@ import java.nio.file.*;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 public class AzureDataLakeFileSystem extends FileSystem {
 
     private final AzureDataLakeFileSystemProvider provider;
-    private final DataLakeFileSystemClient fileSystemClient;
+    private final DataLakeServiceClient serviceClient;
+    private final Map<String, DataLakeFileSystemClient> containerClients = new ConcurrentHashMap<>();
     private final URI rootUri;
     private volatile boolean open = true;
 
     AzureDataLakeFileSystem(AzureDataLakeFileSystemProvider provider,
-                             DataLakeFileSystemClient fileSystemClient,
+                             DataLakeServiceClient serviceClient,
                              URI rootUri) {
         this.provider = provider;
-        this.fileSystemClient = fileSystemClient;
+        this.serviceClient = serviceClient;
         this.rootUri = rootUri;
     }
 
-    DataLakeFileSystemClient getFileSystemClient() {
-        return fileSystemClient;
+    DataLakeFileSystemClient getFileSystemClient(String containerName) {
+        return containerClients.computeIfAbsent(containerName, serviceClient::getFileSystemClient);
     }
 
     URI getRootUri() {
@@ -64,7 +67,13 @@ public class AzureDataLakeFileSystem extends FileSystem {
 
     @Override
     public Iterable<Path> getRootDirectories() {
-        return Collections.singletonList(new AzureDataLakePath(this, "/"));
+        List<Path> roots = new ArrayList<>();
+        String host = rootUri.getHost();
+        for (String containerName : containerClients.keySet()) {
+            String authority = containerName + "@" + host;
+            roots.add(new AzureDataLakePath(this, authority, "/"));
+        }
+        return roots;
     }
 
     @Override

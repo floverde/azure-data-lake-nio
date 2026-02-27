@@ -22,7 +22,7 @@ class AzureDataLakePathTest {
         when(mockFs.provider()).thenReturn(mockProvider);
         when(mockFs.getSeparator()).thenReturn("/");
         when(mockFs.getRootUri()).thenReturn(
-                URI.create("abfss://mycontainer@myaccount.dfs.core.windows.net"));
+                URI.create("abfss://myaccount.dfs.core.windows.net"));
     }
 
     @Test
@@ -146,7 +146,8 @@ class AzureDataLakePathTest {
 
     @Test
     void testToUri() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar");
+        AzureDataLakePath p = new AzureDataLakePath(mockFs,
+                "mycontainer@myaccount.dfs.core.windows.net", "/foo/bar");
         URI uri = p.toUri();
         assertEquals("abfss", uri.getScheme());
         assertEquals("mycontainer@myaccount.dfs.core.windows.net", uri.getAuthority());
@@ -186,6 +187,30 @@ class AzureDataLakePathTest {
         AzureDataLakePath p1 = new AzureDataLakePath(mockFs, "/foo/bar");
         AzureDataLakePath p2 = new AzureDataLakePath(mockFs, "/foo/bar");
         assertEquals(p1.hashCode(), p2.hashCode());
+    }
+
+    @Test
+    void testAuthorityPropagatedThroughPathOps() {
+        String authority = "mycontainer@myaccount.dfs.core.windows.net";
+        AzureDataLakePath p = new AzureDataLakePath(mockFs, authority, "/foo/bar");
+
+        assertEquals(authority, p.getAuthority());
+        // authority is propagated to getParent
+        assertEquals(authority, ((AzureDataLakePath) p.getParent()).getAuthority());
+        // authority is propagated to resolve
+        assertEquals(authority, ((AzureDataLakePath) p.resolve("baz")).getAuthority());
+        // authority is propagated to toAbsolutePath
+        assertEquals(authority, ((AzureDataLakePath) p.toAbsolutePath()).getAuthority());
+    }
+
+    @Test
+    void testPathsWithDifferentAuthoritiesAreNotEqual() {
+        AzureDataLakePath p1 = new AzureDataLakePath(mockFs,
+                "container1@account.dfs.core.windows.net", "/foo/bar");
+        AzureDataLakePath p2 = new AzureDataLakePath(mockFs,
+                "container2@account.dfs.core.windows.net", "/foo/bar");
+        assertNotEquals(p1, p2);
+        assertNotEquals(p1.hashCode(), p2.hashCode());
     }
 
     @Test

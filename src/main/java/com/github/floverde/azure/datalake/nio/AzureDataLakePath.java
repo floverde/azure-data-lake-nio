@@ -1,5 +1,7 @@
 package com.github.floverde.azure.datalake.nio;
 
+import com.azure.storage.file.datalake.DataLakeFileSystemClient;
+
 import java.io.File;
 import java.net.URI;
 import java.nio.file.*;
@@ -8,11 +10,17 @@ import java.util.*;
 public class AzureDataLakePath implements Path {
 
     private final AzureDataLakeFileSystem fileSystem;
+    private final String authority; // e.g. container@account.dfs.core.windows.net, may be null
     private final String pathString; // normalized, no trailing slash except "/"
 
-    AzureDataLakePath(AzureDataLakeFileSystem fileSystem, String path) {
+    AzureDataLakePath(AzureDataLakeFileSystem fileSystem, String authority, String path) {
         this.fileSystem = fileSystem;
+        this.authority = authority;
         this.pathString = normalize(path);
+    }
+
+    AzureDataLakePath(AzureDataLakeFileSystem fileSystem, String path) {
+        this(fileSystem, null, path);
     }
 
     private static String normalize(String path) {
@@ -32,6 +40,23 @@ public class AzureDataLakePath implements Path {
         return pathString;
     }
 
+    String getAuthority() {
+        return authority;
+    }
+
+    DataLakeFileSystemClient getFileSystemClient() {
+        if (authority == null) {
+            throw new IllegalStateException("Path has no container authority; use provider.getPath(URI) to create paths");
+        }
+        int atIndex = authority.indexOf('@');
+        if (atIndex < 0) {
+            throw new IllegalStateException(
+                    "Authority must be in format container@account.dfs.core.windows.net, but was: " + authority);
+        }
+        String containerName = authority.substring(0, atIndex);
+        return fileSystem.getFileSystemClient(containerName);
+    }
+
     @Override
     public AzureDataLakeFileSystem getFileSystem() {
         return fileSystem;
@@ -45,7 +70,7 @@ public class AzureDataLakePath implements Path {
     @Override
     public Path getRoot() {
         if (isAbsolute()) {
-            return new AzureDataLakePath(fileSystem, "/");
+            return new AzureDataLakePath(fileSystem, authority, "/");
         }
         return null;
     }
@@ -62,7 +87,7 @@ public class AzureDataLakePath implements Path {
         if (parts.length == 0) {
             return null;
         }
-        return new AzureDataLakePath(fileSystem, parts[parts.length - 1]);
+        return new AzureDataLakePath(fileSystem, authority, parts[parts.length - 1]);
     }
 
     @Override
@@ -75,9 +100,9 @@ public class AzureDataLakePath implements Path {
             return null;
         }
         if (lastSlash == 0) {
-            return new AzureDataLakePath(fileSystem, "/");
+            return new AzureDataLakePath(fileSystem, authority, "/");
         }
-        return new AzureDataLakePath(fileSystem, pathString.substring(0, lastSlash));
+        return new AzureDataLakePath(fileSystem, authority, pathString.substring(0, lastSlash));
     }
 
     @Override
@@ -91,7 +116,7 @@ public class AzureDataLakePath implements Path {
         if (index < 0 || index >= parts.length) {
             throw new IllegalArgumentException("Index out of range: " + index);
         }
-        return new AzureDataLakePath(fileSystem, parts[index]);
+        return new AzureDataLakePath(fileSystem, authority, parts[index]);
     }
 
     @Override
@@ -105,7 +130,7 @@ public class AzureDataLakePath implements Path {
             if (sb.length() > 0) sb.append('/');
             sb.append(parts[i]);
         }
-        return new AzureDataLakePath(fileSystem, sb.toString());
+        return new AzureDataLakePath(fileSystem, authority, sb.toString());
     }
 
     @Override
@@ -196,7 +221,7 @@ public class AzureDataLakePath implements Path {
             sb.append(it.next());
             if (it.hasNext()) sb.append('/');
         }
-        return new AzureDataLakePath(fileSystem, sb.toString());
+        return new AzureDataLakePath(fileSystem, authority, sb.toString());
     }
 
     @Override
@@ -212,12 +237,12 @@ public class AzureDataLakePath implements Path {
             return o;
         }
         String base = pathString.endsWith("/") ? pathString : pathString + "/";
-        return new AzureDataLakePath(fileSystem, base + o.pathString);
+        return new AzureDataLakePath(fileSystem, authority, base + o.pathString);
     }
 
     @Override
     public Path resolve(String other) {
-        return resolve(new AzureDataLakePath(fileSystem, other));
+        return resolve(new AzureDataLakePath(fileSystem, authority, other));
     }
 
     @Override
@@ -231,7 +256,7 @@ public class AzureDataLakePath implements Path {
 
     @Override
     public Path resolveSibling(String other) {
-        return resolveSibling(new AzureDataLakePath(fileSystem, other));
+        return resolveSibling(new AzureDataLakePath(fileSystem, authority, other));
     }
 
     @Override
@@ -241,7 +266,7 @@ public class AzureDataLakePath implements Path {
             throw new IllegalArgumentException("Cannot relativize absolute path against relative path");
         }
         if (this.pathString.equals(o.pathString)) {
-            return new AzureDataLakePath(fileSystem, "");
+            return new AzureDataLakePath(fileSystem, authority, "");
         }
         String[] thisParts = this.getSegments();
         String[] otherParts = o.getSegments();
@@ -259,7 +284,7 @@ public class AzureDataLakePath implements Path {
             if (sb.length() > 0) sb.append('/');
             sb.append(otherParts[i]);
         }
-        return new AzureDataLakePath(fileSystem, sb.toString());
+        return new AzureDataLakePath(fileSystem, authority, sb.toString());
     }
 
     @Override
@@ -267,7 +292,7 @@ public class AzureDataLakePath implements Path {
         if (isAbsolute()) {
             return this;
         }
-        return new AzureDataLakePath(fileSystem, "/" + pathString);
+        return new AzureDataLakePath(fileSystem, authority, "/" + pathString);
     }
 
     @Override
@@ -282,11 +307,13 @@ public class AzureDataLakePath implements Path {
 
     @Override
     public URI toUri() {
-        URI rootUri = fileSystem.getRootUri();
         String path = isAbsolute() ? pathString : "/" + pathString;
-        // rootUri is like abfss://container@account.dfs.core.windows.net
-        String uriStr = rootUri.toString() + path;
-        return URI.create(uriStr);
+        try {
+            return new URI("abfss", authority, path, null, null);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Cannot build URI for path " + pathString + " with authority " + authority, e);
+        }
     }
 
     @Override
@@ -304,7 +331,7 @@ public class AzureDataLakePath implements Path {
         String[] parts = getSegments();
         List<Path> list = new ArrayList<>();
         for (String part : parts) {
-            list.add(new AzureDataLakePath(fileSystem, part));
+            list.add(new AzureDataLakePath(fileSystem, authority, part));
         }
         return list.iterator();
     }
@@ -312,6 +339,9 @@ public class AzureDataLakePath implements Path {
     @Override
     public int compareTo(Path other) {
         AzureDataLakePath o = toAzurePath(other);
+        int cmp = Objects.compare(this.authority, o.authority,
+                Comparator.nullsFirst(String::compareTo));
+        if (cmp != 0) return cmp;
         return this.pathString.compareTo(o.pathString);
     }
 
@@ -321,12 +351,13 @@ public class AzureDataLakePath implements Path {
         if (!(obj instanceof AzureDataLakePath)) return false;
         AzureDataLakePath other = (AzureDataLakePath) obj;
         return Objects.equals(fileSystem, other.fileSystem)
+                && Objects.equals(authority, other.authority)
                 && Objects.equals(pathString, other.pathString);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(fileSystem, pathString);
+        return Objects.hash(fileSystem, authority, pathString);
     }
 
     @Override
@@ -366,6 +397,6 @@ public class AzureDataLakePath implements Path {
         if (p instanceof AzureDataLakePath) {
             return (AzureDataLakePath) p;
         }
-        return new AzureDataLakePath(fileSystem, p.toString());
+        return new AzureDataLakePath(fileSystem, authority, p.toString());
     }
 }

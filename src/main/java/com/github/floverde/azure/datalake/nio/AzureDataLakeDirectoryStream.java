@@ -55,7 +55,7 @@ public class AzureDataLakeDirectoryStream implements DirectoryStream<Path> {
                 if (done) return false;
                 while (source.hasNext()) {
                     PathItem item = source.next();
-                    AzureDataLakePath p = new AzureDataLakePath(dir.getFileSystem(), "/" + item.getName());
+                    AzureDataLakePath p = new AzureDataLakePath(dir.getFileSystem(), dir.getAuthority(), "/" + item.getName());
                     try {
                         if (filter == null || filter.accept(p)) {
                             next = p;

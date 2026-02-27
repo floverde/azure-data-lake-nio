@@ -47,7 +47,6 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
             throw new IllegalArgumentException(
                     "URI authority must be container@account.dfs.core.windows.net: " + authority);
         }
-        String containerName = authority.substring(0, atIndex);
         String host = authority.substring(atIndex + 1);
         String endpoint = "https://" + host;
 
@@ -67,9 +66,8 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
 
         DataLakeServiceClient serviceClient = builder.buildClient();
-        DataLakeFileSystemClient fsClient = serviceClient.getFileSystemClient(containerName);
 
-        AzureDataLakeFileSystem fs = new AzureDataLakeFileSystem(this, fsClient, rootUri);
+        AzureDataLakeFileSystem fs = new AzureDataLakeFileSystem(this, serviceClient, rootUri);
         fileSystems.put(rootUri, fs);
         return fs;
     }
@@ -87,18 +85,19 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     @Override
     public Path getPath(URI uri) {
         AzureDataLakeFileSystem fs = (AzureDataLakeFileSystem) getFileSystem(uri);
+        String authority = uri.getAuthority();
         String path = uri.getPath();
         if (path == null || path.isEmpty()) {
             path = "/";
         }
-        return fs.getPath(path);
+        return new AzureDataLakePath(fs, authority, path);
     }
 
     @Override
     public InputStream newInputStream(Path path, OpenOption... options) throws IOException {
         AzureDataLakePath adlsPath = toAzureDataLakePath(path);
         try {
-            return adlsPath.getFileSystem().getFileSystemClient()
+            return adlsPath.getFileSystemClient()
                     .getFileClient(adlsPath.toAzurePathString())
                     .openInputStream()
                     .getInputStream();
@@ -120,7 +119,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         boolean createNew = opts.contains(StandardOpenOption.CREATE_NEW);
 
         com.azure.storage.file.datalake.DataLakeFileClient fileClient =
-                adlsPath.getFileSystem().getFileSystemClient()
+                adlsPath.getFileSystemClient()
                         .getFileClient(adlsPath.toAzurePathString());
 
         if (createNew) {
@@ -147,7 +146,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     public DirectoryStream<Path> newDirectoryStream(Path dir, DirectoryStream.Filter<? super Path> filter)
             throws IOException {
         AzureDataLakePath adlsPath = toAzureDataLakePath(dir);
-        DataLakeFileSystemClient fsClient = adlsPath.getFileSystem().getFileSystemClient();
+        DataLakeFileSystemClient fsClient = adlsPath.getFileSystemClient();
         return new AzureDataLakeDirectoryStream(adlsPath, fsClient, filter);
     }
 
@@ -155,7 +154,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     public void createDirectory(Path dir, FileAttribute<?>... attrs) throws IOException {
         AzureDataLakePath adlsPath = toAzureDataLakePath(dir);
         try {
-            adlsPath.getFileSystem().getFileSystemClient()
+            adlsPath.getFileSystemClient()
                     .getDirectoryClient(adlsPath.toAzurePathString())
                     .create();
         } catch (DataLakeStorageException e) {
@@ -167,7 +166,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     public void delete(Path path) throws IOException {
         AzureDataLakePath adlsPath = toAzureDataLakePath(path);
         try {
-            adlsPath.getFileSystem().getFileSystemClient()
+            adlsPath.getFileSystemClient()
                     .getFileClient(adlsPath.toAzurePathString())
                     .delete();
         } catch (DataLakeStorageException e) {
@@ -191,7 +190,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
 
         if (!replaceExisting) {
             try {
-                dst.getFileSystem().getFileSystemClient()
+                dst.getFileSystemClient()
                         .getFileClient(dst.toAzurePathString())
                         .getProperties();
                 throw new FileAlreadyExistsException(target.toString());
@@ -206,14 +205,14 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         java.nio.file.Path tmp = createSecureTempFile("adls-copy-");
         try {
             try (FileOutputStream fos = new FileOutputStream(tmp.toFile())) {
-                src.getFileSystem().getFileSystemClient()
+                src.getFileSystemClient()
                         .getFileClient(src.toAzurePathString())
                         .read(fos);
             } catch (DataLakeStorageException e) {
                 throw toIOException(e, source);
             }
             try {
-                dst.getFileSystem().getFileSystemClient()
+                dst.getFileSystemClient()
                         .getFileClient(dst.toAzurePathString())
                         .uploadFromFile(tmp.toAbsolutePath().toString(), true);
             } catch (DataLakeStorageException e) {
@@ -237,7 +236,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
 
         if (!replaceExisting) {
             try {
-                dst.getFileSystem().getFileSystemClient()
+                dst.getFileSystemClient()
                         .getFileClient(dst.toAzurePathString())
                         .getProperties();
                 throw new FileAlreadyExistsException(target.toString());
@@ -249,7 +248,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
         }
 
         try {
-            src.getFileSystem().getFileSystemClient()
+            src.getFileSystemClient()
                     .getFileClient(src.toAzurePathString())
                     .rename(null, dst.toAzurePathString());
         } catch (DataLakeStorageException e) {
@@ -287,7 +286,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
             return;
         }
         try {
-            adlsPath.getFileSystem().getFileSystemClient()
+            adlsPath.getFileSystemClient()
                     .getFileClient(pathStr)
                     .getProperties();
         } catch (DataLakeStorageException e) {
@@ -316,7 +315,7 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
             return (A) new AzureDataLakeFileAttributes();
         }
         try {
-            PathProperties props = adlsPath.getFileSystem().getFileSystemClient()
+            PathProperties props = adlsPath.getFileSystemClient()
                     .getFileClient(pathStr)
                     .getProperties();
             Map<String, String> metadata = props.getMetadata();
@@ -386,8 +385,14 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider {
     }
 
     private static URI toRootUri(URI uri) {
+        String authority = uri.getAuthority();
+        if (authority == null) {
+            throw new IllegalArgumentException("URI must have authority: " + uri);
+        }
+        int atIndex = authority.indexOf('@');
+        String host = atIndex >= 0 ? authority.substring(atIndex + 1) : authority;
         try {
-            return new URI(uri.getScheme(), uri.getAuthority(), null, null, null);
+            return new URI(uri.getScheme(), host, null, null, null);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid URI: " + uri, e);
         }
