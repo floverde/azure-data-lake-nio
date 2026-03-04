@@ -1,16 +1,17 @@
-# azure-data-lake-nio
+# Azure Data Lake Storage Gen2 NIO.2 adapter
 
-A Java NIO.2 `FileSystemProvider` for **Azure Data Lake Storage Gen2** (ADLS Gen2), enabling standard `java.nio.file` API access to ADLS Gen2 storage.
+A Java NIO.2 `FileSystemProvider` for **Azure Data Lake Storage Gen2** (ADLS Gen2),
+enabling standard `java.nio.file` API access to ADLS Gen2 storage.
 
 ## Features
 
-- Full Java NIO.2 `FileSystem` / `Path` / `FileSystemProvider` integration
-- Account-level and container-level file system hierarchy
-- Supports reading, writing (create/overwrite), appending, deleting, copying, moving, and listing directory entries
-- `SeekableByteChannel` support for random-read access
-- Lazy directory listing via `DirectoryStream`
-- Authentication via account key or SAS token
-- URI scheme: `abfss://`
+- Full Java NIO.2 `FileSystem` / `Path` / `FileSystemProvider` integration.
+- Account-level and container-level file system hierarchy.
+- Supports reading, writing (create/overwrite), appending, deleting, copying, moving, and listing directory entries.
+- `SeekableByteChannel` support for random-read access.
+- Lazy directory listing via `DirectoryStream`.
+- Authentication via account key or SAS token.
+- URI scheme: `abfss://`.
 
 ## Requirements
 
@@ -23,9 +24,9 @@ A Java NIO.2 `FileSystemProvider` for **Azure Data Lake Storage Gen2** (ADLS Gen
 abfss://<container>@<account>.dfs.core.windows.net/<path>
 ```
 
-- `<container>` — the ADLS Gen2 container (file system) name
-- `<account>` — the storage account name
-- `<path>` — the path within the container (optional)
+- `<container>` — the ADLS Gen2 container (file system) name.
+- `<account>` — the storage account name.
+- `<path>` — the path within the container (optional).
 
 **Account-level URI** (no container specified):
 ```
@@ -57,8 +58,7 @@ FileSystem fs = FileSystems.newFileSystem(uri, env);
 Path file = fs.getPath("/data/input.csv");
 
 // Or use the provider directly
-Path file = Path.of(URI.create(
-    "abfss://mycontainer@myaccount.dfs.core.windows.net/data/input.csv"));
+Path file = Path.of(URI.create("abfss://mycontainer@myaccount.dfs.core.windows.net/data/input.csv"));
 ```
 
 ### Reading a File
@@ -79,14 +79,12 @@ try (SeekableByteChannel ch = Files.newByteChannel(file, StandardOpenOption.READ
 
 ```java
 // Overwrite (create or truncate)
-try (OutputStream out = Files.newOutputStream(file,
-        StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+try (OutputStream out = Files.newOutputStream(file, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
     out.write("hello".getBytes());
 }
 
 // Append
-try (OutputStream out = Files.newOutputStream(file,
-        StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
+try (OutputStream out = Files.newOutputStream(file, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
     out.write(" world".getBytes());
 }
 ```
@@ -125,15 +123,15 @@ fs.close();
 
 ## Project Structure
 
-| Class | Description |
-|---|---|
+| Class                             | Description                                                                           |
+|-----------------------------------|---------------------------------------------------------------------------------------|
 | `AzureDataLakeFileSystemProvider` | The NIO.2 `FileSystemProvider` (URI scheme `abfss`). Entry point for file operations. |
-| `ADLSAccountFileSystem` | Account-level `FileSystem`. Manages container file systems. |
-| `ADLSContainerFileSystem` | Container-level `FileSystem`. Used for all path and I/O operations. |
-| `AzureDataLakePath` | `Path` implementation backed by an ADLS Gen2 container. |
-| `AzureDataLakeFileAttributes` | `BasicFileAttributes` implementation. |
-| `AzureDataLakeDirectoryStream` | Lazy `DirectoryStream` implementation using the ADLS SDK. |
-| `AzureSeekableByteChannel` | `SeekableByteChannel` for reading blobs; write-only channels supported for upload. |
+| `ADLSAccountFileSystem`           | Account-level `FileSystem`. Manages container file systems.                           |
+| `ADLSContainerFileSystem`         | Container-level `FileSystem`. Used for all path and I/O operations.                   |
+| `AzureDataLakePath`               | `Path` implementation backed by an ADLS Gen2 container.                               |
+| `AzureDataLakeFileAttributes`     | `BasicFileAttributes` implementation.                                                 |
+| `AzureDataLakeDirectoryStream`    | Lazy `DirectoryStream` implementation using the ADLS SDK.                             |
+| `AzureSeekableByteChannel`        | `SeekableByteChannel` for reading blobs; write-only channels supported for upload.    |
 
 ## Building
 

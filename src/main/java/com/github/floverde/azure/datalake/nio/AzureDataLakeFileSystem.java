@@ -2,7 +2,6 @@ package com.github.floverde.azure.datalake.nio;
 
 import java.net.URI;
 import java.nio.file.attribute.UserPrincipalLookupService;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.PatternSyntaxException;
 import java.util.regex.Pattern;
 import java.util.Collections;
