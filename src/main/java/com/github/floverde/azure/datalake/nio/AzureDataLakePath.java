@@ -9,6 +9,18 @@ import java.io.File;
 import java.net.URI;
 import java.util.*;
 
+/**
+ * A {@link Path} implementation for Azure Data Lake Storage Gen2.
+ * <p>Paths are normalized on creation: backslashes are converted to forward slashes
+ * and any trailing slashes are removed (except for the root path {@code "/"}).</p>
+ * <p>Absolute paths start with {@code "/"}, while relative paths do not.
+ * The root path is represented as {@code "/"} and the empty string represents
+ * the empty (relative) path.</p>
+ * <p>Conversion to {@link java.io.File} and registration with a
+ * {@link WatchService} are not supported.</p>
+ *
+ * @see ADLSContainerFileSystem
+ */
 public class AzureDataLakePath implements Path
 {
     private final ADLSContainerFileSystem fileSystem;

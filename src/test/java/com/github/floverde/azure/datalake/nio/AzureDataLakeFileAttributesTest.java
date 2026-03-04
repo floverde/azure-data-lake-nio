@@ -1,5 +1,6 @@
 package com.github.floverde.azure.datalake.nio;
 
+import com.azure.storage.file.datalake.models.PathItem;
 import com.azure.storage.file.datalake.models.PathProperties;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +70,43 @@ class AzureDataLakeFileAttributesTest {
         AzureDataLakeFileAttributes attrs = new AzureDataLakeFileAttributes(props, false);
         assertEquals(FileTime.from(Instant.EPOCH), attrs.lastModifiedTime());
         assertEquals(FileTime.from(Instant.EPOCH), attrs.creationTime());
+        assertEquals(0L, attrs.size());
+    }
+
+    @Test
+    void testPathItemFileAttributes() {
+        PathItem item = mock(PathItem.class);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime created = now.minusDays(1);
+        when(item.getLastModified()).thenReturn(now);
+        when(item.getCreationTime()).thenReturn(created);
+        when(item.getContentLength()).thenReturn(2048L);
+        when(item.isDirectory()).thenReturn(false);
+
+        AzureDataLakeFileAttributes attrs = new AzureDataLakeFileAttributes(item);
+
+        assertFalse(attrs.isDirectory());
+        assertTrue(attrs.isRegularFile());
+        assertFalse(attrs.isSymbolicLink());
+        assertFalse(attrs.isOther());
+        assertEquals(2048L, attrs.size());
+        assertNull(attrs.fileKey());
+        assertEquals(FileTime.from(now.toInstant()), attrs.lastModifiedTime());
+        assertEquals(FileTime.from(created.toInstant()), attrs.creationTime());
+    }
+
+    @Test
+    void testPathItemDirectoryAttributes() {
+        PathItem item = mock(PathItem.class);
+        when(item.getLastModified()).thenReturn(OffsetDateTime.now(ZoneOffset.UTC));
+        when(item.getCreationTime()).thenReturn(OffsetDateTime.now(ZoneOffset.UTC));
+        when(item.getContentLength()).thenReturn(0L);
+        when(item.isDirectory()).thenReturn(true);
+
+        AzureDataLakeFileAttributes attrs = new AzureDataLakeFileAttributes(item);
+
+        assertTrue(attrs.isDirectory());
+        assertFalse(attrs.isRegularFile());
         assertEquals(0L, attrs.size());
     }
 }
