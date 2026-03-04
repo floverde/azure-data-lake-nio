@@ -1,16 +1,20 @@
 package com.github.floverde.azure.datalake.nio;
 
+import com.azure.storage.file.datalake.DataLakeDirectoryClient;
+import com.azure.storage.file.datalake.DataLakeFileClient;
+import io.netty.util.internal.EmptyArrays;
+import io.netty.util.internal.StringUtil;
+import java.nio.file.*;
 import java.io.File;
 import java.net.URI;
-import java.nio.file.*;
 import java.util.*;
 
-public class AzureDataLakePath implements Path {
-
-    private final AzureDataLakeFileSystem fileSystem;
+public class AzureDataLakePath implements Path
+{
+    private final ADLSContainerFileSystem fileSystem;
     private final String pathString; // normalized, no trailing slash except "/"
 
-    AzureDataLakePath(AzureDataLakeFileSystem fileSystem, String path) {
+    AzureDataLakePath(final ADLSContainerFileSystem fileSystem, final String path) {
         this.fileSystem = fileSystem;
         this.pathString = normalize(path);
     }
@@ -33,7 +37,7 @@ public class AzureDataLakePath implements Path {
     }
 
     @Override
-    public AzureDataLakeFileSystem getFileSystem() {
+    public ADLSContainerFileSystem getFileSystem() {
         return fileSystem;
     }
 
@@ -282,7 +286,7 @@ public class AzureDataLakePath implements Path {
 
     @Override
     public URI toUri() {
-        URI rootUri = fileSystem.getRootUri();
+        URI rootUri = fileSystem.getRootURI();
         String path = isAbsolute() ? pathString : "/" + pathString;
         // rootUri is like abfss://container@account.dfs.core.windows.net
         String uriStr = rootUri.toString() + path;
@@ -340,7 +344,7 @@ public class AzureDataLakePath implements Path {
      */
     String[] getSegments() {
         if (pathString.isEmpty() || pathString.equals("/")) {
-            return new String[0];
+            return EmptyArrays.EMPTY_STRINGS;
         }
         String s = pathString;
         if (s.startsWith("/")) {
@@ -353,13 +357,13 @@ public class AzureDataLakePath implements Path {
      * Returns the path string suitable for use with Azure SDK (no leading slash).
      */
     String toAzurePathString() {
-        if (pathString.equals("/") || pathString.isEmpty()) {
-            return "";
+        if (this.isRoot()) {
+            return StringUtil.EMPTY_STRING;
         }
-        if (pathString.startsWith("/")) {
-            return pathString.substring(1);
+        if (this.pathString.startsWith("/")) {
+            return this.pathString.substring(1);
         }
-        return pathString;
+        return this.pathString;
     }
 
     private AzureDataLakePath toAzurePath(Path p) {
@@ -367,5 +371,23 @@ public class AzureDataLakePath implements Path {
             return (AzureDataLakePath) p;
         }
         return new AzureDataLakePath(fileSystem, p.toString());
+    }
+
+    DataLakeDirectoryClient getDirectoryClient() {
+        return this.fileSystem.getDirectoryClient(this);
+    }
+
+    DataLakeFileClient getFileClient() {
+        return this.fileSystem.getFileClient(this);
+    }
+
+    static void ensureFileSystemOpen(final Path path) {
+        if (!path.getFileSystem().isOpen()) {
+            throw new ClosedFileSystemException();
+        }
+    }
+
+    public final boolean isRoot() {
+        return this.pathString.isEmpty() || this.pathString.equals("/");
     }
 }

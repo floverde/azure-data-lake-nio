@@ -45,7 +45,7 @@ public class AzureDataLakeDirectoryStream implements DirectoryStream<Path> {
         // Lazy iterator wrapping the SDK PagedIterable to avoid loading all entries into memory.
         Iterator<PathItem> source = client.listPaths(options, Duration.ofSeconds(30)).iterator();
 
-        return new Iterator<Path>() {
+        return new Iterator<>() {
             private Path next = null;
             private boolean done = false;
 

@@ -8,12 +8,12 @@ import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 
-public class AzureDataLakeFileAttributes implements BasicFileAttributes {
-
+public class AzureDataLakeFileAttributes implements BasicFileAttributes
+{
+    private final long size;
+    private final boolean directory;
     private final FileTime creationTime;
     private final FileTime lastModifiedTime;
-    private final boolean directory;
-    private final long size;
 
     AzureDataLakeFileAttributes(PathProperties props, boolean isDirectory) {
         this.creationTime = toFileTime(props.getCreationTime());
@@ -80,12 +80,12 @@ public class AzureDataLakeFileAttributes implements BasicFileAttributes {
     }
 
     @Override
-    public long size() {
-        return size;
+    public Object fileKey() {
+        return null;
     }
 
     @Override
-    public Object fileKey() {
-        return null;
+    public long size() {
+        return size;
     }
 }

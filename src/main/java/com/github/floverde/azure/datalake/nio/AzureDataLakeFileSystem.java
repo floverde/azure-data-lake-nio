@@ -1,70 +1,33 @@
 package com.github.floverde.azure.datalake.nio;
 
-import com.azure.storage.file.datalake.DataLakeFileSystemClient;
-
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.*;
 import java.nio.file.attribute.UserPrincipalLookupService;
-import java.nio.file.spi.FileSystemProvider;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.PatternSyntaxException;
+import java.util.regex.Pattern;
+import java.util.Collections;
+import java.util.Objects;
+import java.nio.file.*;
+import java.util.Set;
 
-public class AzureDataLakeFileSystem extends FileSystem {
+public abstract class AzureDataLakeFileSystem extends FileSystem
+{
+    private static final String SEPARATOR = "/";
 
-    private final AzureDataLakeFileSystemProvider provider;
-    private final DataLakeFileSystemClient fileSystemClient;
-    private final URI rootUri;
-    private volatile boolean open = true;
+    protected final AzureDataLakeFileSystemProvider provider;
 
-    AzureDataLakeFileSystem(AzureDataLakeFileSystemProvider provider,
-                             DataLakeFileSystemClient fileSystemClient,
-                             URI rootUri) {
-        this.provider = provider;
-        this.fileSystemClient = fileSystemClient;
-        this.rootUri = rootUri;
-    }
-
-    DataLakeFileSystemClient getFileSystemClient() {
-        return fileSystemClient;
-    }
-
-    URI getRootUri() {
-        return rootUri;
+    protected AzureDataLakeFileSystem(final AzureDataLakeFileSystemProvider provider) {
+        this.provider = Objects.requireNonNull(provider, "provider must not be null");
     }
 
     @Override
-    public FileSystemProvider provider() {
-        return provider;
+    public final AzureDataLakeFileSystemProvider provider() {
+        return this.provider;
     }
 
     @Override
-    public void close() throws IOException {
-        if (open) {
-            open = false;
-            provider.removeFileSystem(rootUri);
-        }
-    }
-
-    @Override
-    public boolean isOpen() {
-        return open;
-    }
-
-    @Override
-    public boolean isReadOnly() {
-        return false;
-    }
-
-    @Override
-    public String getSeparator() {
-        return "/";
-    }
-
-    @Override
-    public Iterable<Path> getRootDirectories() {
-        return Collections.singletonList(new AzureDataLakePath(this, "/"));
+    public final String getSeparator() {
+        return AzureDataLakeFileSystem.SEPARATOR;
     }
 
     @Override
@@ -78,15 +41,8 @@ public class AzureDataLakeFileSystem extends FileSystem {
     }
 
     @Override
-    public Path getPath(String first, String... more) {
-        StringBuilder sb = new StringBuilder(first);
-        for (String s : more) {
-            if (sb.length() > 0 && !sb.toString().endsWith("/") && !s.startsWith("/")) {
-                sb.append('/');
-            }
-            sb.append(s);
-        }
-        return new AzureDataLakePath(this, sb.toString());
+    public boolean isReadOnly() {
+        return false;
     }
 
     @Override
@@ -171,4 +127,6 @@ public class AzureDataLakeFileSystem extends FileSystem {
     public WatchService newWatchService() {
         throw new UnsupportedOperationException("WatchService is not supported");
     }
+
+    public abstract URI getRootURI();
 }

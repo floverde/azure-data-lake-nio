@@ -1,162 +1,167 @@
 package com.github.floverde.azure.datalake.nio;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.net.URI;
-import java.nio.file.Path;
-import java.util.Iterator;
-
+import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import java.nio.file.Path;
+import java.util.Iterator;
+import java.net.URI;
 
-class AzureDataLakePathTest {
-
-    private AzureDataLakeFileSystem mockFs;
+public final class AzureDataLakePathTest
+{
+    private ADLSContainerFileSystem mockFs;
     private AzureDataLakeFileSystemProvider mockProvider;
 
     @BeforeEach
-    void setUp() {
-        mockFs = mock(AzureDataLakeFileSystem.class);
-        mockProvider = mock(AzureDataLakeFileSystemProvider.class);
-        when(mockFs.provider()).thenReturn(mockProvider);
-        when(mockFs.getSeparator()).thenReturn("/");
-        when(mockFs.getRootUri()).thenReturn(
-                URI.create("abfss://mycontainer@myaccount.dfs.core.windows.net"));
+    public void setUp() {
+        final URI rootURI;
+        this.mockFs = mock(ADLSContainerFileSystem.class);
+        this.mockProvider = mock(AzureDataLakeFileSystemProvider.class);
+        rootURI = URI.create("abfss://mycontainer@myaccount.dfs.core.windows.net");
+        when(this.mockFs.provider()).thenReturn(this.mockProvider);
+        when(this.mockFs.getSeparator()).thenReturn("/");
+        when(this.mockFs.getRootURI()).thenReturn(rootURI);
     }
 
     @Test
-    void testAbsolutePath() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar");
-        assertTrue(p.isAbsolute());
-        assertEquals("/foo/bar", p.toString());
+    public void testAbsolutePath() {
+        final AzureDataLakePath path;
+        path = this.getPath("/foo/bar");
+        assertTrue(path.isAbsolute());
+        assertEquals("/foo/bar", path.toString());
     }
 
     @Test
-    void testRelativePath() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "foo/bar");
-        assertFalse(p.isAbsolute());
-        assertEquals("foo/bar", p.toString());
+    public void testRelativePath() {
+        final AzureDataLakePath path;
+        path = this.getPath("foo/bar");
+        assertFalse(path.isAbsolute());
+        assertEquals("foo/bar", path.toString());
     }
 
     @Test
-    void testRoot() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar");
-        Path root = p.getRoot();
+    public void testRoot() {
+        final Path root;
+        final AzureDataLakePath rel;
+        final AzureDataLakePath path;
+        path = this.getPath("/foo/bar");
+        root = path.getRoot();
         assertNotNull(root);
         assertEquals("/", root.toString());
 
-        AzureDataLakePath rel = new AzureDataLakePath(mockFs, "foo/bar");
+        rel = this.getPath("foo/bar");
         assertNull(rel.getRoot());
     }
 
     @Test
-    void testGetFileName() {
-        assertEquals("bar", new AzureDataLakePath(mockFs, "/foo/bar").getFileName().toString());
-        assertEquals("foo", new AzureDataLakePath(mockFs, "foo").getFileName().toString());
-        assertNull(new AzureDataLakePath(mockFs, "/").getFileName());
+    public void testGetFileName() {
+        assertEquals("bar", this.getPath("/foo/bar").getFileName().toString());
+        assertEquals("foo", this.getPath("foo").getFileName().toString());
+        assertNull(this.getPath("/").getFileName());
     }
 
     @Test
-    void testGetParent() {
-        assertEquals("/foo", new AzureDataLakePath(mockFs, "/foo/bar").getParent().toString());
-        assertEquals("/", new AzureDataLakePath(mockFs, "/foo").getParent().toString());
-        assertNull(new AzureDataLakePath(mockFs, "/").getParent());
-        assertNull(new AzureDataLakePath(mockFs, "foo").getParent());
+    public void testGetParent() {
+        assertEquals("/foo", this.getPath("/foo/bar").getParent().toString());
+        assertEquals("/", this.getPath("/foo").getParent().toString());
+        assertNull(this.getPath("/").getParent());
+        assertNull(this.getPath("foo").getParent());
     }
 
     @Test
-    void testGetNameCount() {
-        assertEquals(2, new AzureDataLakePath(mockFs, "/foo/bar").getNameCount());
-        assertEquals(0, new AzureDataLakePath(mockFs, "/").getNameCount());
-        assertEquals(1, new AzureDataLakePath(mockFs, "foo").getNameCount());
+    public void testGetNameCount() {
+        assertEquals(2, this.getPath("/foo/bar").getNameCount());
+        assertEquals(0, this.getPath("/").getNameCount());
+        assertEquals(1, this.getPath("foo").getNameCount());
     }
 
     @Test
-    void testGetName() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar/baz");
-        assertEquals("foo", p.getName(0).toString());
-        assertEquals("bar", p.getName(1).toString());
-        assertEquals("baz", p.getName(2).toString());
-        assertThrows(IllegalArgumentException.class, () -> p.getName(3));
+    public void testGetName() {
+        final AzureDataLakePath path = this.getPath("/foo/bar/baz");
+        assertEquals("foo", path.getName(0).toString());
+        assertEquals("bar", path.getName(1).toString());
+        assertEquals("baz", path.getName(2).toString());
+        assertThrows(IllegalArgumentException.class, () -> path.getName(3));
     }
 
     @Test
-    void testSubpath() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar/baz");
-        assertEquals("bar/baz", p.subpath(1, 3).toString());
-        assertEquals("foo/bar", p.subpath(0, 2).toString());
+    public void testSubpath() {
+        final AzureDataLakePath path = this.getPath("/foo/bar/baz");
+        assertEquals("bar/baz", path.subpath(1, 3).toString());
+        assertEquals("foo/bar", path.subpath(0, 2).toString());
     }
 
     @Test
-    void testStartsWith() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar/baz");
-        assertTrue(p.startsWith(new AzureDataLakePath(mockFs, "/foo")));
-        assertTrue(p.startsWith(new AzureDataLakePath(mockFs, "/foo/bar")));
-        assertTrue(p.startsWith(new AzureDataLakePath(mockFs, "/")));
-        assertFalse(p.startsWith(new AzureDataLakePath(mockFs, "/bar")));
-        assertFalse(p.startsWith(new AzureDataLakePath(mockFs, "foo")));
+    public void testStartsWith() {
+        final AzureDataLakePath path = this.getPath("/foo/bar/baz");
+        assertTrue(path.startsWith(this.getPath("/foo")));
+        assertTrue(path.startsWith(this.getPath("/foo/bar")));
+        assertTrue(path.startsWith(this.getPath("/")));
+        assertFalse(path.startsWith(this.getPath("/bar")));
+        assertFalse(path.startsWith(this.getPath("foo")));
     }
 
     @Test
-    void testEndsWith() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar/baz");
-        assertTrue(p.endsWith(new AzureDataLakePath(mockFs, "baz")));
-        assertTrue(p.endsWith(new AzureDataLakePath(mockFs, "bar/baz")));
-        assertFalse(p.endsWith(new AzureDataLakePath(mockFs, "foo")));
+    public void testEndsWith() {
+        final AzureDataLakePath path = this.getPath("/foo/bar/baz");
+        assertTrue(path.endsWith(this.getPath("baz")));
+        assertTrue(path.endsWith(this.getPath("bar/baz")));
+        assertFalse(path.endsWith(this.getPath("foo")));
     }
 
     @Test
-    void testNormalize() {
-        assertEquals("/foo/baz",
-                new AzureDataLakePath(mockFs, "/foo/bar/../baz").normalize().toString());
-        assertEquals("/foo/bar",
-                new AzureDataLakePath(mockFs, "/foo/./bar").normalize().toString());
-        assertEquals("foo/baz",
-                new AzureDataLakePath(mockFs, "foo/bar/../baz").normalize().toString());
+    public void testNormalize() {
+        assertEquals("/foo/baz", this.getPath("/foo/bar/../baz").normalize().toString());
+        assertEquals("/foo/bar", this.getPath("/foo/./bar").normalize().toString());
+        assertEquals("foo/baz", this.getPath("foo/bar/../baz").normalize().toString());
     }
 
     @Test
-    void testResolve() {
-        AzureDataLakePath base = new AzureDataLakePath(mockFs, "/foo");
+    public void testResolve() {
+        final AzureDataLakePath base = this.getPath("/foo");
         assertEquals("/foo/bar", base.resolve("bar").toString());
         assertEquals("/bar", base.resolve("/bar").toString());
         assertEquals("/foo", base.resolve("").toString());
     }
 
     @Test
-    void testRelativize() {
-        AzureDataLakePath p1 = new AzureDataLakePath(mockFs, "/foo/bar");
-        AzureDataLakePath p2 = new AzureDataLakePath(mockFs, "/foo/bar/baz");
+    public void testRelativize() {
+        final AzureDataLakePath p1, p2, p3;
+        p1 = this.getPath("/foo/bar");
+        p2 = this.getPath("/foo/bar/baz");
         assertEquals("baz", p1.relativize(p2).toString());
 
-        AzureDataLakePath p3 = new AzureDataLakePath(mockFs, "/foo");
-        assertEquals("../bar",
-                p3.relativize(new AzureDataLakePath(mockFs, "/baz/../bar")).normalize().toString());
+        p3 = this.getPath("/foo");
+        assertEquals("../bar", p3.relativize(this.getPath("/baz/../bar")).normalize().toString());
     }
 
     @Test
-    void testToAbsolutePath() {
-        AzureDataLakePath rel = new AzureDataLakePath(mockFs, "foo/bar");
+    public void testToAbsolutePath() {
+        final AzureDataLakePath abs, rel = this.getPath("foo/bar");
         assertEquals("/foo/bar", rel.toAbsolutePath().toString());
 
-        AzureDataLakePath abs = new AzureDataLakePath(mockFs, "/foo/bar");
+        abs = this.getPath("/foo/bar");
         assertSame(abs, abs.toAbsolutePath());
     }
 
     @Test
-    void testToUri() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar");
-        URI uri = p.toUri();
+    public void testToUri() {
+        final URI uri;
+        final AzureDataLakePath path;
+        path = this.getPath("/foo/bar");
+        uri = path.toUri();
         assertEquals("abfss", uri.getScheme());
         assertEquals("mycontainer@myaccount.dfs.core.windows.net", uri.getAuthority());
         assertEquals("/foo/bar", uri.getPath());
     }
 
     @Test
-    void testIterator() {
-        AzureDataLakePath p = new AzureDataLakePath(mockFs, "/foo/bar/baz");
-        Iterator<Path> it = p.iterator();
+    public void testIterator() {
+        final Iterator<Path> it;
+        final AzureDataLakePath path;
+        path = this.getPath("/foo/bar/baz");
+        it = path.iterator();
         assertEquals("foo", it.next().toString());
         assertEquals("bar", it.next().toString());
         assertEquals("baz", it.next().toString());
@@ -164,34 +169,41 @@ class AzureDataLakePathTest {
     }
 
     @Test
-    void testCompareTo() {
-        AzureDataLakePath a = new AzureDataLakePath(mockFs, "/foo/bar");
-        AzureDataLakePath b = new AzureDataLakePath(mockFs, "/foo/baz");
+    public void testCompareTo() {
+        final AzureDataLakePath a, b;
+        a = this.getPath("/foo/bar");
+        b = this.getPath("/foo/baz");
         assertTrue(a.compareTo(b) < 0);
         assertTrue(b.compareTo(a) > 0);
-        assertEquals(0, a.compareTo(new AzureDataLakePath(mockFs, "/foo/bar")));
+        assertEquals(0, a.compareTo(this.getPath("/foo/bar")));
     }
 
     @Test
-    void testEquals() {
-        AzureDataLakePath p1 = new AzureDataLakePath(mockFs, "/foo/bar");
-        AzureDataLakePath p2 = new AzureDataLakePath(mockFs, "/foo/bar");
-        AzureDataLakePath p3 = new AzureDataLakePath(mockFs, "/foo/baz");
+    public void testEquals() {
+        final AzureDataLakePath p1, p2, p3;
+        p1 = this.getPath("/foo/bar");
+        p2 = this.getPath("/foo/bar");
+        p3 = this.getPath("/foo/baz");
         assertEquals(p1, p2);
         assertNotEquals(p1, p3);
     }
 
     @Test
-    void testHashCode() {
-        AzureDataLakePath p1 = new AzureDataLakePath(mockFs, "/foo/bar");
-        AzureDataLakePath p2 = new AzureDataLakePath(mockFs, "/foo/bar");
+    public void testHashCode() {
+        final AzureDataLakePath p1, p2;
+        p1 = this.getPath("/foo/bar");
+        p2 = this.getPath("/foo/bar");
         assertEquals(p1.hashCode(), p2.hashCode());
     }
 
     @Test
-    void testToAzurePathString() {
-        assertEquals("foo/bar", new AzureDataLakePath(mockFs, "/foo/bar").toAzurePathString());
-        assertEquals("foo/bar", new AzureDataLakePath(mockFs, "foo/bar").toAzurePathString());
-        assertEquals("", new AzureDataLakePath(mockFs, "/").toAzurePathString());
+    public void testToAzurePathString() {
+        assertEquals("foo/bar", this.getPath("/foo/bar").toAzurePathString());
+        assertEquals("foo/bar", this.getPath("foo/bar").toAzurePathString());
+        assertEquals("", this.getPath("/").toAzurePathString());
+    }
+
+    private AzureDataLakePath getPath(final String path) {
+        return new AzureDataLakePath(this.mockFs, path);
     }
 }
