@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.github.floverde.azure.datalake.nio.AzureDataLakePathTest
 -------------------------------------------------------------------------------
-Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.129 s -- in com.github.floverde.azure.datalake.nio.AzureDataLakePathTest
+Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.120 s -- in com.github.floverde.azure.datalake.nio.AzureDataLakePathTest
