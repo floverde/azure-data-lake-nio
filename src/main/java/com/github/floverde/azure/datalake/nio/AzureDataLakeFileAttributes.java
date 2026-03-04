@@ -8,6 +8,24 @@ import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 
+/**
+ * Implementation of {@link BasicFileAttributes} for Azure Data Lake Storage Gen2.
+ * <p>File attributes can be constructed from:</p>
+ * <ul>
+ *   <li>{@link PathProperties} — for individual file or directory property lookups.</li>
+ *   <li>{@link PathItem} — for entries returned by a directory listing.</li>
+ *   <li>The no-arg constructor — for the root directory, which always exists.</li>
+ * </ul>
+ * <p>Azure Data Lake Storage Gen2 does not support symbolic links or other special
+ * file types; {@link #isSymbolicLink()} and {@link #isOther()} always return
+ * {@code false}.</p>
+ * <p>Since ADLS Gen2 does not track last access time separately,
+ * {@link #lastAccessTime()} returns the same value as {@link #lastModifiedTime()}.</p>
+ * <p>If a creation or modification timestamp is {@code null} it defaults to
+ * {@link java.time.Instant#EPOCH}.</p>
+ *
+ * @see BasicFileAttributes
+ */
 public class AzureDataLakeFileAttributes implements BasicFileAttributes
 {
     private final long size;
@@ -15,6 +33,12 @@ public class AzureDataLakeFileAttributes implements BasicFileAttributes
     private final FileTime creationTime;
     private final FileTime lastModifiedTime;
 
+    /**
+     * Creates file attributes from a {@link PathProperties} object.
+     *
+     * @param props       the path properties returned by the Azure SDK; must not be {@code null}.
+     * @param isDirectory {@code true} if the path represents a directory.
+     */
     AzureDataLakeFileAttributes(PathProperties props, boolean isDirectory) {
         this.creationTime = toFileTime(props.getCreationTime());
         this.lastModifiedTime = toFileTime(props.getLastModified());
@@ -22,6 +46,11 @@ public class AzureDataLakeFileAttributes implements BasicFileAttributes
         this.size = props.getFileSize();
     }
 
+    /**
+     * Creates file attributes from a {@link PathItem} returned by a directory listing.
+     *
+     * @param item the path item from the Azure SDK directory listing; must not be {@code null}.
+     */
     AzureDataLakeFileAttributes(PathItem item) {
         this.creationTime = toFileTime(item.getCreationTime());
         this.lastModifiedTime = toFileTime(item.getLastModified());
