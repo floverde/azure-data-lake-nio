@@ -1,13 +1,13 @@
 package com.github.floverde.azure.datalake.nio;
 
-import java.net.URI;
+import com.github.floverde.azure.datalake.nio.matchers.GlobPathMatcher;
+import com.github.floverde.azure.datalake.nio.matchers.RegexPathMatcher;
 import java.nio.file.attribute.UserPrincipalLookupService;
-import java.util.regex.PatternSyntaxException;
-import java.util.regex.Pattern;
 import java.util.Collections;
 import java.util.Objects;
 import java.nio.file.*;
 import java.util.Set;
+import java.net.URI;
 
 /**
  * Abstract base class for Azure Data Lake Storage Gen2 file systems.
@@ -18,8 +18,7 @@ import java.util.Set;
  * {@code "basic"} file attribute view. Write operations are supported; the file system
  * is never read-only.</p>
  * <p>Path matchers with both {@code glob} and {@code regex} syntax are supported.
- * Neither {@link java.nio.file.WatchService} nor
- * {@link java.nio.file.attribute.UserPrincipalLookupService} are supported.</p>
+ * Neither {@link WatchService} nor {@link UserPrincipalLookupService} are supported.</p>
  *
  * @see ADLSAccountFileSystem
  * @see ADLSContainerFileSystem
@@ -107,76 +106,22 @@ public abstract class AzureDataLakeFileSystem extends FileSystem
      * @return a {@link PathMatcher} for the given pattern.
      */
     @Override
-    public PathMatcher getPathMatcher(String syntaxAndPattern) {
-        int colonIndex = syntaxAndPattern.indexOf(':');
-        if (colonIndex <= 0) {
+    public PathMatcher getPathMatcher(final String syntaxAndPattern) {
+        final String syntax, pattern;
+        final int colonIndex = syntaxAndPattern.indexOf(':');
+        if (colonIndex > 0) {
+            syntax = syntaxAndPattern.substring(0, colonIndex);
+            pattern = syntaxAndPattern.substring(colonIndex + 1);
+            if ("glob".equalsIgnoreCase(syntax)) {
+                return new GlobPathMatcher(pattern);
+            }
+            if ("regex".equalsIgnoreCase(syntax)) {
+                return new RegexPathMatcher(pattern);
+            }
+            throw new UnsupportedOperationException("Syntax not supported: " + syntax);
+        } else {
             throw new IllegalArgumentException("Invalid syntaxAndPattern: " + syntaxAndPattern);
         }
-        String syntax = syntaxAndPattern.substring(0, colonIndex);
-        String pattern = syntaxAndPattern.substring(colonIndex + 1);
-
-        Pattern regexPattern;
-        if ("glob".equalsIgnoreCase(syntax)) {
-            regexPattern = Pattern.compile(globToRegex(pattern));
-        } else if ("regex".equalsIgnoreCase(syntax)) {
-            try {
-                regexPattern = Pattern.compile(pattern);
-            } catch (PatternSyntaxException e) {
-                throw new PatternSyntaxException(e.getDescription(), e.getPattern(), e.getIndex());
-            }
-        } else {
-            throw new UnsupportedOperationException("Syntax not supported: " + syntax);
-        }
-
-        Pattern finalPattern = regexPattern;
-        return path -> finalPattern.matcher(path.toString()).matches();
-    }
-
-    private static String globToRegex(String glob) {
-        StringBuilder sb = new StringBuilder("^");
-        for (int i = 0; i < glob.length(); i++) {
-            char c = glob.charAt(i);
-            switch (c) {
-                case '*':
-                    if (i + 1 < glob.length() && glob.charAt(i + 1) == '*') {
-                        sb.append(".*");
-                        i++;
-                    } else {
-                        sb.append("[^/]*");
-                    }
-                    break;
-                case '?':
-                    sb.append("[^/]");
-                    break;
-                case '{':
-                    sb.append("(?:");
-                    break;
-                case '}':
-                    sb.append(")");
-                    break;
-                case ',':
-                    sb.append("|");
-                    break;
-                case '.':
-                case '(':
-                case ')':
-                case '+':
-                case '|':
-                case '^':
-                case '$':
-                case '@':
-                case '%':
-                case '[':
-                case ']':
-                case '\\':
-                    sb.append('\\').append(c);
-                    break;
-                default:
-                    sb.append(c);
-            }
-        }
-        sb.append("$");
-        return sb.toString();
     }
 
     /**

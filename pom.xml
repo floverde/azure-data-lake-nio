@@ -18,17 +18,26 @@
     </properties>
 
     <dependencies>
+        <!-- https://mvnrepository.com/artifact/com.azure/azure-storage-file-datalake -->
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.26.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.hrakaroo/glob -->
+        <dependency>
+            <groupId>com.hrakaroo</groupId>
+            <artifactId>glob</artifactId>
+            <version>0.9.0</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.mockito/mockito-core -->
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
