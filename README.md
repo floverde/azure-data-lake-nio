@@ -1,4 +1,4 @@
-# Azure Data Lake Storage Gen2 NIO.2 adapter
+# Azure Data Lake Storage Gen2 NIO.2 file system
 
 A Java NIO.2 `FileSystemProvider` for **Azure Data Lake Storage Gen2** (ADLS Gen2),
 enabling standard `java.nio.file` API access to ADLS Gen2 storage.
@@ -167,6 +167,7 @@ fs.close();
 | `AzureDataLakeFileSystemProvider` | The NIO.2 `FileSystemProvider` (URI scheme `abfss`). Entry point for file operations. |
 | `ADLSAccountFileSystem`           | Account-level `FileSystem`. Manages container file systems.                           |
 | `ADLSContainerFileSystem`         | Container-level `FileSystem`. Used for all path and I/O operations.                   |
+| `ADLSConfigurationReader`         | Utility for reading configuration and credentials from the environment map.           |
 | `AzureDataLakePath`               | `Path` implementation backed by an ADLS Gen2 container.                               |
 | `AzureDataLakeFileAttributes`     | `BasicFileAttributes` implementation.                                                 |
 | `AzureDataLakeDirectoryStream`    | Lazy `DirectoryStream` implementation using the ADLS SDK.                             |

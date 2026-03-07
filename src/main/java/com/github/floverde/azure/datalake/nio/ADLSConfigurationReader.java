@@ -14,15 +14,12 @@ import java.util.Objects;
 import java.util.Map;
 
 /**
- * Reads authentication configuration from an environment map and provides methods to build
- * the corresponding Azure SDK credential objects.
- *
- * <p>An instance is constructed with the raw {@code env} map passed to
- * {@link AzureDataLakeFileSystemProvider#newFileSystem} together with the storage-account
- * authority (e.g. {@code myaccount.dfs.core.windows.net}).  The class exposes a pair of methods
- * for each supported credential type: a {@code has*} predicate that returns {@code true} when
- * all required keys are present, and a {@code get*} factory that constructs the corresponding
- * credential object.</p>
+ * Reads authentication configuration from an environment map and provides methods to build the corresponding
+ * Azure SDK credential objects.<p>An instance is constructed with the raw {@code env} map passed to {@link
+ * AzureDataLakeFileSystemProvider#newFileSystem} together with the storage-account authority (e.g. {@code
+ * myaccount.dfs.core.windows.net}). The class exposes a pair of methods for each supported credential type:
+ * a {@code has*} predicate that returns {@code true} when all required keys are present, and a {@code get*}
+ * factory that constructs the corresponding credential object.</p>
  *
  * <p>Supported environment map keys and their credential types:</p>
  * <ul>
@@ -39,51 +36,70 @@ import java.util.Map;
  */
 public final class ADLSConfigurationReader
 {
-    /** Storage-account authority (e.g. {@code myaccount.dfs.core.windows.net}). */
+    /**
+     * Storage-account authority (e.g. {@code myaccount.dfs.core.windows.net}).
+     */
     private final String authority;
 
-    /** Immutable view of the environment map; never {@code null}. */
+    /**
+     * Immutable view of the environment map; never {@code null}.
+     */
     private final Map<String, ?> config;
 
-    /** Environment map key for the Azure AD application (client) identifier, used for service principal authentication. */
+    /**
+     * Environment map key for the Azure AD application (client)
+     * identifier, used for service principal authentication.
+     * */
     private static final String CLIENT_ID = "azure.client.id";
 
-    /** Environment map key for the Azure AD tenant identifier, used for service principal authentication. */
+    /**
+     * Environment map key for the Azure AD tenant identifier,
+     * used for service principal authentication.
+     */
     private static final String TENANT_ID = "azure.tenant.id";
 
-    /** Environment map key for the SAS token string. */
+    /**
+     * Environment map key for the SAS token string.
+     */
     private static final String SAS_TOKEN = "azure.sas.token";
 
-    /** Environment map key for a pre-built {@link TokenCredential} instance. */
+    /**
+     * Environment map key for a pre-built {@link TokenCredential} instance.
+     */
     private static final String PRE_BUILT = "azure.credential";
 
-    /** Environment map key for the storage account shared key (Base64-encoded). */
+    /**
+     * Environment map key for the storage account shared key (Base64-encoded).
+     */
     private static final String ACCOUNT_KEY = "azure.account.key";
 
-    /** Environment map key for the service-principal client secret. */
+    /**
+     * Environment map key for the service-principal client secret.
+     */
     private static final String CLIENT_SECRET = "azure.client.secret";
 
     /**
-     * Environment map key that enables system-assigned managed identity when set to {@code "true"}
-     * (case-insensitive).
+     * Environment map key that enables system-assigned managed
+     * identity when set to {@code "true"} (case-insensitive).
      */
     private static final String AUTO_MANAGED_IDENTITY = "azure.managed.identity.auto";
 
-    /** Environment map key for the client ID of a user-assigned managed identity. */
+    /**
+     * Environment map key for the client ID of a user-assigned managed identity.
+     */
     private static final String MANAGED_IDENTITY_CLIENT_ID = "azure.managed.identity.client.id";
 
     /**
      * Creates a new {@code ADLSConfigurationReader}.
      *
-     * @param env       the environment map passed to
-     *                  {@link AzureDataLakeFileSystemProvider#newFileSystem}; may be {@code null},
-     *                  in which case it is treated as an empty map.
+     * @param env the environment map passed to {@link AzureDataLakeFileSystemProvider#newFileSystem};
+     *            may be {@code null}, in which case it is treated as an empty map.
      * @param authority the storage-account authority extracted from the file-system URI
      *                  (e.g. {@code myaccount.dfs.core.windows.net}).
      */
     public ADLSConfigurationReader(final Map<String, ?> env, final String authority) {
+        this.authority = Objects.requireNonNull(authority, "authority must not be null");
         this.config = env != null ? env : Collections.emptyMap();
-        this.authority = authority;
     }
 
     /**
@@ -97,11 +113,10 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Builds a {@link StorageSharedKeyCredential} from the {@value #ACCOUNT_KEY} entry in the
-     * environment map.
-     *
-     * <p>The account name is derived by extracting the segment of {@code authority} that precedes
-     * the first {@code '.'} character.</p>
+     * Builds a {@link StorageSharedKeyCredential} from
+     * the {@value #ACCOUNT_KEY} entry in the environment map.
+     * <p>The account name is derived by extracting the segment of {@code
+     * authority} that precedes the first {@code '.'} character.</p>
      *
      * @return a new {@link StorageSharedKeyCredential} for the configured account.
      */
@@ -116,8 +131,7 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Returns {@code true} if the environment map contains the SAS token key
-     * ({@value #SAS_TOKEN}).
+     * Returns {@code true} if the environment map contains the SAS token key ({@value #SAS_TOKEN}).
      *
      * @return {@code true} when a SAS token has been configured.
      */
@@ -126,8 +140,7 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Builds an {@link AzureSasCredential} from the {@value #SAS_TOKEN} entry in the environment
-     * map.
+     * Builds an {@link AzureSasCredential} from the {@value #SAS_TOKEN} entry in the environment map.
      *
      * @return a new {@link AzureSasCredential} for the configured SAS token.
      */
@@ -137,8 +150,7 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Returns {@code true} if the environment map contains the pre-built credential key
-     * ({@value #PRE_BUILT}).
+     * Returns {@code true} if the environment map contains the pre-built credential key ({@value #PRE_BUILT}).
      *
      * @return {@code true} when a pre-built {@link TokenCredential} has been configured.
      */
@@ -147,8 +159,8 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Retrieves the pre-built {@link TokenCredential} from the {@value #PRE_BUILT} entry in the
-     * environment map.
+     * Retrieves the pre-built {@link TokenCredential} from
+     * the {@value #PRE_BUILT} entry in the environment map.
      *
      * @return the configured {@link TokenCredential} instance.
      * @throws AzureException if the value stored under {@value #PRE_BUILT} is {@code null} or is
@@ -168,11 +180,10 @@ public final class ADLSConfigurationReader
     }
 
     /**
-     * Returns {@code true} if the environment map contains all three service-principal keys:
-     * {@value #CLIENT_ID}, {@value #CLIENT_SECRET}, and {@value #TENANT_ID}.
+     * Returns {@code true} if the environment map contains all three service-principal
+     * keys: {@value #CLIENT_ID}, {@value #CLIENT_SECRET}, and {@value #TENANT_ID}.
      *
-     * @return {@code true} when a complete service-principal (client-secret) configuration is
-     *         present.
+     * @return {@code true} when a complete service-principal (client-secret) configuration is present.
      */
     public boolean hasClientSecretCredential() {
         return this.config.containsKey(ADLSConfigurationReader.CLIENT_ID) && this.
@@ -207,7 +218,6 @@ public final class ADLSConfigurationReader
 
     /**
      * Builds a {@link ManagedIdentityCredential}.
-     *
      * <p>When {@value #MANAGED_IDENTITY_CLIENT_ID} is present in the environment map the
      * credential is configured for that specific user-assigned identity; otherwise a
      * system-assigned identity credential is returned.</p>
@@ -215,13 +225,15 @@ public final class ADLSConfigurationReader
      * @return a new {@link ManagedIdentityCredential} for the configured managed identity.
      */
     public ManagedIdentityCredential getManagedIdentityCredential() {
+        // Create a new ManagedIdentityCredential using the client ID from the configuration
+        // if present, otherwise it will default to a system-assigned identity credential
         return new ManagedIdentityCredentialBuilder().clientId(this.getString(
                 ADLSConfigurationReader.MANAGED_IDENTITY_CLIENT_ID)).build();
     }
 
     /**
-     * Returns the string value associated with {@code key} in the configuration map, or
-     * {@code null} if the key is absent or mapped to {@code null}.
+     * Returns the string value associated with {@code key} in the configuration
+     * map, or {@code null} if the key is absent or mapped to {@code null}.
      *
      * @param key the configuration key to look up.
      * @return the string representation of the value, or {@code null}.

@@ -1,11 +1,7 @@
 package com.github.floverde.azure.datalake.nio;
 
 import com.azure.core.util.CoreUtils;
-import com.azure.core.credential.AzureSasCredential;
 import com.azure.core.credential.TokenCredential;
-import com.azure.identity.ClientSecretCredentialBuilder;
-import com.azure.identity.ManagedIdentityCredentialBuilder;
-import com.azure.storage.common.StorageSharedKeyCredential;
 import com.azure.storage.file.datalake.DataLakeFileClient;
 import com.azure.storage.file.datalake.DataLakeFileSystemClient;
 import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
@@ -143,24 +139,44 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider
     private ADLSAccountFileSystem createFileSystem(final URI rootURI, final Map<String, ?> env) {
         final DataLakeServiceClientBuilder builder;
         final ADLSConfigurationReader configuration;
+        // Extract the authority from the root URI
         final String authority = rootURI.getAuthority();
+        // Ensure that the authority is present in the URI
         if (authority != null) {
+            // Initialize the DataLakeServiceClientBuilder with the endpoint constructed from the authority
             builder = new DataLakeServiceClientBuilder().endpoint("https://" + authority);
         } else {
+            // Raise an exception indicating that the URI must have an authority component
             throw new IllegalArgumentException("URI must have authority: " + rootURI);
         }
+        // Create an object to read the configuration from the environment map
         configuration = new ADLSConfigurationReader(env, authority);
+        // Check whether the environment contains a shared key credential
         if (configuration.hasSharedKeyCredential()) {
+            // If a shared key credential is found, configure the builder with it
             builder.credential(configuration.getSharedKeyCredential());
-        } else if (configuration.hasSasCredential()) {
+        }
+        // Check whether the environment contains a SAS token credential
+        else if (configuration.hasSasCredential()) {
+            // If a SAS token credential is found, configure the builder with it
             builder.credential(configuration.getSasCredential());
-        } else if (configuration.hasPreBuiltCredential()) {
+        }
+        // Check whether the environment contains a pre-built TokenCredential instance
+        else if (configuration.hasPreBuiltCredential()) {
+            // If a pre-built TokenCredential is found, configure the builder with it
             builder.credential(configuration.getPreBuiltCredential());
-        } else if (configuration.hasClientSecretCredential()) {
+        }
+        // Check whether the environment contains service principal credentials
+        else if (configuration.hasClientSecretCredential()) {
+            // If service principal credentials are found, configure the builder with it
             builder.credential(configuration.getClientSecretCredential());
-        } else if (configuration.hasManagedIdentityCredential()) {
+        }
+        // Check whether the environment contains managed identity credentials
+        else if (configuration.hasManagedIdentityCredential()) {
+            // If managed identity credentials are found, configure the builder with it
             builder.credential(configuration.getManagedIdentityCredential());
         }
+        // Create a new account-level file system using the configured builder and root URI
         return new ADLSAccountFileSystem(this, builder.buildClient(), rootURI);
     }
 
