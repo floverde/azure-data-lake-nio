@@ -1,8 +1,7 @@
 package com.github.floverde.azure.datalake.nio;
 
 import com.azure.core.util.CoreUtils;
-import com.azure.core.credential.AzureSasCredential;
-import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.core.credential.TokenCredential;
 import com.azure.storage.file.datalake.DataLakeFileClient;
 import com.azure.storage.file.datalake.DataLakeFileSystemClient;
 import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
@@ -23,7 +22,20 @@ import java.io.*;
  * File system provider for Azure Data Lake Storage Gen2, implementing the {@link FileSystemProvider} interface to
  * allow Java applications to interact with ADLS Gen2 using the standard NIO APIs.<p>This provider supports efficient
  * connection management by caching account-level file system instances based on the root URI (scheme + authority),
- * and allows for flexible authentication using account keys or SAS tokens provided through the environment map.</p>
+ * and allows for flexible authentication using account keys, SAS tokens, service principal credentials, managed
+ * identity, or any {@link TokenCredential} instance provided through the environment map.</p>
+ *
+ * <p>Supported authentication environment map keys:</p>
+ * <ul>
+ *   <li>{@code azure.account.key} — Storage account shared key (Base64-encoded string).</li>
+ *   <li>{@code azure.sas.token} — Shared Access Signature token string.</li>
+ *   <li>{@code azure.credential} — A pre-built {@link TokenCredential} instance (highest precedence after account key
+ *       and SAS token).</li>
+ *   <li>{@code azure.client.id} + {@code azure.client.secret} + {@code azure.tenant.id} — Service principal
+ *       (client secret) credentials.</li>
+ *   <li>{@code azure.managed.identity.client.id} — User-assigned managed identity client ID. If omitted but the key
+ *       {@code azure.managed.identity.auto} is set to {@code "true"}, system-assigned managed identity is used.</li>
+ * </ul>
  *
  * @see FileSystemProvider
  */
@@ -68,8 +80,9 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider
     /**
      * Creates a new file system for the given URI and environment.
      * <p>The URI must have the scheme "abfss" and an authority in the form of "&lt;account&gt;.dfs.core.windows.net".</p>
-     * <p>The environment map can contain provider-specific properties for authentication, such as "azure.account.key" or
-     * "azure.sas.token".</p><p>The method ensures that only one file system instance is created per account (root URI)
+     * <p>The environment map can contain provider-specific properties for authentication. See the class-level
+     * documentation for the full list of supported authentication keys.</p>
+     * <p>The method ensures that only one file system instance is created per account (root URI)
      * and allows for multiple container-level file systems to be created under the same account.</p>
      *
      * @param uri URI reference.
@@ -108,30 +121,62 @@ public class AzureDataLakeFileSystemProvider extends FileSystemProvider
     /**
      * Creates a new account-level file system for the given root URI and environment.
      *
+     * <p>Authentication is resolved from the environment map in the following priority order:</p>
+     * <ol>
+     *   <li>{@code azure.account.key} — Storage account shared key.</li>
+     *   <li>{@code azure.sas.token} — Shared Access Signature token.</li>
+     *   <li>{@code azure.credential} — A pre-built {@link TokenCredential} instance.</li>
+     *   <li>{@code azure.client.id} + {@code azure.client.secret} + {@code azure.tenant.id} — Service principal
+     *       with client secret.</li>
+     *   <li>{@code azure.managed.identity.client.id} — User-assigned managed identity.</li>
+     *   <li>{@code azure.managed.identity.auto=true} — System-assigned managed identity.</li>
+     * </ol>
+     *
      * @param rootURI the root URI (scheme + authority) for the account-level file system.
      * @param env a map of provider specific properties to configure the file system, such as authentication credentials.
      * @return a new instance of {@link ADLSAccountFileSystem} configured with the given root URI and environment.
      */
     private ADLSAccountFileSystem createFileSystem(final URI rootURI, final Map<String, ?> env) {
         final DataLakeServiceClientBuilder builder;
+        final ADLSConfigurationReader configuration;
+        // Extract the authority from the root URI
         final String authority = rootURI.getAuthority();
+        // Ensure that the authority is present in the URI
         if (authority != null) {
+            // Initialize the DataLakeServiceClientBuilder with the endpoint constructed from the authority
             builder = new DataLakeServiceClientBuilder().endpoint("https://" + authority);
         } else {
+            // Raise an exception indicating that the URI must have an authority component
             throw new IllegalArgumentException("URI must have authority: " + rootURI);
         }
-        if (env != null) {
-            if (env.containsKey("azure.account.key")) {
-                // Extract account name from authority
-                String accountName = StringUtil.substringBefore(authority, '.');
-                String accountKey = (String) env.get("azure.account.key");
-                builder.credential(new StorageSharedKeyCredential(accountName, accountKey));
-            } else if (env.containsKey("azure.sas.token")) {
-                String sasToken = (String) env.get("azure.sas.token");
-                builder.credential(new AzureSasCredential(sasToken));
-            }
-            // For service principal, add azure-identity dependency and use ClientSecretCredentialBuilder.
+        // Create an object to read the configuration from the environment map
+        configuration = new ADLSConfigurationReader(env, authority);
+        // Check whether the environment contains a shared key credential
+        if (configuration.hasSharedKeyCredential()) {
+            // If a shared key credential is found, configure the builder with it
+            builder.credential(configuration.getSharedKeyCredential());
         }
+        // Check whether the environment contains a SAS token credential
+        else if (configuration.hasSasCredential()) {
+            // If a SAS token credential is found, configure the builder with it
+            builder.credential(configuration.getSasCredential());
+        }
+        // Check whether the environment contains a pre-built TokenCredential instance
+        else if (configuration.hasPreBuiltCredential()) {
+            // If a pre-built TokenCredential is found, configure the builder with it
+            builder.credential(configuration.getPreBuiltCredential());
+        }
+        // Check whether the environment contains service principal credentials
+        else if (configuration.hasClientSecretCredential()) {
+            // If service principal credentials are found, configure the builder with it
+            builder.credential(configuration.getClientSecretCredential());
+        }
+        // Check whether the environment contains managed identity credentials
+        else if (configuration.hasManagedIdentityCredential()) {
+            // If managed identity credentials are found, configure the builder with it
+            builder.credential(configuration.getManagedIdentityCredential());
+        }
+        // Create a new account-level file system using the configured builder and root URI
         return new ADLSAccountFileSystem(this, builder.buildClient(), rootURI);
     }
 
