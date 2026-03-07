@@ -86,7 +86,7 @@ FileSystem fs = FileSystems.newFileSystem(uri, env);
 #### 6. System-Assigned Managed Identity
 
 ```java
-Map<String, String> env = Map.of("azure.use.managed.identity", "true");
+Map<String, String> env = Map.of("azure.managed.identity.auto", "true");
 FileSystem fs = FileSystems.newFileSystem(uri, env);
 ```
 

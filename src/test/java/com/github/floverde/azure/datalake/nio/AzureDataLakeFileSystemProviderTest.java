@@ -242,7 +242,7 @@ public final class AzureDataLakeFileSystemProviderTest extends AzureDataLakeFile
         final Object credential;
         final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
         credential = provider.buildCredential("account.dfs.core.windows.net",
-                Map.of("azure.use.managed.identity", "true"));
+                Map.of("azure.managed.identity.auto", "true"));
 
         assertInstanceOf(ManagedIdentityCredential.class, credential);
     }
@@ -252,10 +252,10 @@ public final class AzureDataLakeFileSystemProviderTest extends AzureDataLakeFile
         final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
         assertInstanceOf(ManagedIdentityCredential.class,
                 provider.buildCredential("account.dfs.core.windows.net",
-                        Map.of("azure.use.managed.identity", "TRUE")));
+                        Map.of("azure.managed.identity.auto", "TRUE")));
         assertInstanceOf(ManagedIdentityCredential.class,
                 provider.buildCredential("account.dfs.core.windows.net",
-                        Map.of("azure.use.managed.identity", "True")));
+                        Map.of("azure.managed.identity.auto", "True")));
     }
 
     @Test
