@@ -24,6 +24,12 @@
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.26.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.azure/azure-identity -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-identity</artifactId>
+            <version>1.16.2</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/com.hrakaroo/glob -->
         <dependency>
             <groupId>com.hrakaroo</groupId>

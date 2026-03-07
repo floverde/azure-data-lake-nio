@@ -1,5 +1,10 @@
 package com.github.floverde.azure.datalake.nio;
 
+import com.azure.core.credential.AzureSasCredential;
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.ClientSecretCredential;
+import com.azure.identity.ManagedIdentityCredential;
+import com.azure.storage.common.StorageSharedKeyCredential;
 import org.mockito.Mockito;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -143,6 +148,126 @@ public final class AzureDataLakeFileSystemProviderTest extends AzureDataLakeFile
         assertSame(accountFs, provider.getFileSystem(rootUri));
         provider.fileSystems.remove(rootUri).close();
         assertThrows(FileSystemNotFoundException.class, () -> provider.getFileSystem(rootUri));
+    }
+
+    // ---- buildCredential tests ----
+
+    @Test
+    public void testBuildCredentialWithNullEnvReturnsNull() {
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        assertNull(provider.buildCredential("account.dfs.core.windows.net", null));
+    }
+
+    @Test
+    public void testBuildCredentialWithEmptyEnvReturnsNull() {
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        assertNull(provider.buildCredential("account.dfs.core.windows.net", Map.of()));
+    }
+
+    @Test
+    public void testBuildCredentialWithAccountKey() {
+        final Object credential;
+        final StorageSharedKeyCredential sharedKey;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        credential = provider.buildCredential("myaccount.dfs.core.windows.net",
+                Map.of("azure.account.key", "dGVzdGtleQ=="));
+
+        sharedKey = assertInstanceOf(StorageSharedKeyCredential.class, credential);
+        assertEquals("myaccount", sharedKey.getAccountName());
+    }
+
+    @Test
+    public void testBuildCredentialWithSasToken() {
+        final Object credential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        credential = provider.buildCredential("account.dfs.core.windows.net",
+                Map.of("azure.sas.token", "?sv=2020-08-04&sig=test"));
+
+        assertInstanceOf(AzureSasCredential.class, credential);
+    }
+
+    @Test
+    public void testBuildCredentialWithTokenCredential() {
+        final Object credential;
+        final TokenCredential mockTokenCredential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        mockTokenCredential = Mockito.mock(TokenCredential.class);
+        credential = provider.buildCredential("account.dfs.core.windows.net",
+                Map.of("azure.credential", mockTokenCredential));
+
+        assertSame(mockTokenCredential, credential);
+    }
+
+    @Test
+    public void testBuildCredentialWithInvalidTokenCredentialThrows() {
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        final Map<String, Object> env = Map.of("azure.credential", "not-a-credential");
+        assertThrows(IllegalArgumentException.class,
+                () -> provider.buildCredential("account.dfs.core.windows.net", env));
+    }
+
+    @Test
+    public void testBuildCredentialWithClientSecret() {
+        final Object credential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        credential = provider.buildCredential("account.dfs.core.windows.net", Map.of(
+                "azure.client.id", "my-client-id",
+                "azure.client.secret", "my-client-secret",
+                "azure.tenant.id", "my-tenant-id"));
+
+        assertInstanceOf(ClientSecretCredential.class, credential);
+    }
+
+    @Test
+    public void testBuildCredentialWithClientSecretRequiresAllThreeKeys() {
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        // Missing azure.tenant.id — should not produce a ClientSecretCredential
+        assertNull(provider.buildCredential("account.dfs.core.windows.net", Map.of(
+                "azure.client.id", "my-client-id",
+                "azure.client.secret", "my-client-secret")));
+    }
+
+    @Test
+    public void testBuildCredentialWithUserAssignedManagedIdentity() {
+        final Object credential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        credential = provider.buildCredential("account.dfs.core.windows.net",
+                Map.of("azure.managed.identity.client.id", "my-mi-client-id"));
+
+        assertInstanceOf(ManagedIdentityCredential.class, credential);
+    }
+
+    @Test
+    public void testBuildCredentialWithSystemAssignedManagedIdentity() {
+        final Object credential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        credential = provider.buildCredential("account.dfs.core.windows.net",
+                Map.of("azure.use.managed.identity", "true"));
+
+        assertInstanceOf(ManagedIdentityCredential.class, credential);
+    }
+
+    @Test
+    public void testBuildCredentialManagedIdentityFlagCaseInsensitive() {
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        assertInstanceOf(ManagedIdentityCredential.class,
+                provider.buildCredential("account.dfs.core.windows.net",
+                        Map.of("azure.use.managed.identity", "TRUE")));
+        assertInstanceOf(ManagedIdentityCredential.class,
+                provider.buildCredential("account.dfs.core.windows.net",
+                        Map.of("azure.use.managed.identity", "True")));
+    }
+
+    @Test
+    public void testBuildCredentialPriorityAccountKeyOverSasToken() {
+        final Object credential;
+        final AzureDataLakeFileSystemProvider provider = new AzureDataLakeFileSystemProvider();
+        // When both keys are present, account key takes precedence
+        credential = provider.buildCredential("myaccount.dfs.core.windows.net", Map.of(
+                "azure.account.key", "dGVzdGtleQ==",
+                "azure.sas.token", "?sv=2020-08-04&sig=test"));
+
+        assertInstanceOf(StorageSharedKeyCredential.class, credential);
     }
 
     /** Testable subclass that allows injecting filesystems without Azure connection. */

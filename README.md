@@ -10,7 +10,7 @@ enabling standard `java.nio.file` API access to ADLS Gen2 storage.
 - Supports reading, writing (create/overwrite), appending, deleting, copying, moving, and listing directory entries.
 - `SeekableByteChannel` support for random-read access.
 - Lazy directory listing via `DirectoryStream`.
-- Authentication via account key or SAS token.
+- Authentication via account key, SAS token, service principal, managed identity, or any `TokenCredential`.
 - URI scheme: `abfss://`.
 
 ## Requirements
@@ -37,17 +37,56 @@ abfss://<account>.dfs.core.windows.net
 
 ### Opening a File System
 
+Authentication credentials are provided through the environment map passed to `FileSystems.newFileSystem()`.
+The following authentication mechanisms are supported, evaluated in priority order:
+
+#### 1. Account Key (Shared Key)
+
 ```java
 URI uri = URI.create("abfss://mycontainer@myaccount.dfs.core.windows.net");
-
-// Authenticate with an account key
 Map<String, String> env = Map.of("azure.account.key", "<base64-encoded-key>");
 FileSystem fs = FileSystems.newFileSystem(uri, env);
 ```
 
-Or with a SAS token:
+#### 2. SAS Token
+
 ```java
 Map<String, String> env = Map.of("azure.sas.token", "<sas-token>");
+FileSystem fs = FileSystems.newFileSystem(uri, env);
+```
+
+#### 3. Pre-built `TokenCredential`
+
+Pass any `com.azure.core.credential.TokenCredential` instance (e.g. from `azure-identity`):
+
+```java
+TokenCredential credential = new DefaultAzureCredentialBuilder().build();
+Map<String, Object> env = Map.of("azure.credential", credential);
+FileSystem fs = FileSystems.newFileSystem(uri, env);
+```
+
+#### 4. Service Principal (Client Secret)
+
+```java
+Map<String, String> env = Map.of(
+    "azure.client.id",     "<application-client-id>",
+    "azure.client.secret", "<client-secret>",
+    "azure.tenant.id",     "<tenant-id>"
+);
+FileSystem fs = FileSystems.newFileSystem(uri, env);
+```
+
+#### 5. User-Assigned Managed Identity
+
+```java
+Map<String, String> env = Map.of("azure.managed.identity.client.id", "<managed-identity-client-id>");
+FileSystem fs = FileSystems.newFileSystem(uri, env);
+```
+
+#### 6. System-Assigned Managed Identity
+
+```java
+Map<String, String> env = Map.of("azure.use.managed.identity", "true");
 FileSystem fs = FileSystems.newFileSystem(uri, env);
 ```
 
